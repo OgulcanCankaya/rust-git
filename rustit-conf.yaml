@@ -1,0 +1,11 @@
+#if you want to give more then one repository directory parent please add "-" to the beginning#
+repo_parent:
+  - /home/ogulcan/Desktop/repos/
+ssh_pub:
+  /home/ogulcan/.ssh/git.pub
+ssh_priv:
+  /home/ogulcan/.ssh/git
+signature_name:
+  Ogulcan Çankaya
+signature_mail:
+  ogulcan985@outlook.com
