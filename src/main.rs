@@ -14,9 +14,6 @@ use std::path::{Path,PathBuf};
 use std::process::Command;
 use std::{thread, time};
 
-
-
-
 //#[derive(Deserialize)]
 struct State {
     progress: Option<Progress<'static>>,
@@ -24,6 +21,9 @@ struct State {
     current: usize,
     path: Option<PathBuf>,
     newline: bool,
+}
+fn str_concat( x: &String ,  y:  &String) -> String {
+    return &y.clone() + &x.clone();
 }
 fn print(state: &mut State) {
     let stats = state.progress.as_ref().unwrap();
@@ -68,21 +68,23 @@ fn print(state: &mut State) {
     }
     io::stdout().flush().unwrap();
 }
-fn clone(url : &String, path : &String,config : Config) -> Result<(), git2::Error> {
-    let state = RefCell::new(State {
-        progress: None,
-        total: 0,
-        current: 0,
-        path: None,
-        newline: false,
-    });
+fn clone(url : &String, path : &String,config : &Config) -> Result<(), git2::Error> {
+    println!("url  {}\npath  {}",url.clone(),Path::new(path).display());
+
+//    let state = RefCell::new(State {
+//        progress: None,
+//        total: 0,
+//        current: 0,
+//        path: None,
+//        newline: false,
+//    });
     let mut cb = RemoteCallbacks::new();
-    cb.transfer_progress(|stats| {
-        let mut state = state.borrow_mut();
-        state.progress = Some(stats.to_owned());
-        print(&mut *state);
-        true
-    });
+//    cb.transfer_progress(|stats| {
+//        let mut state = state.borrow_mut();
+//        state.progress = Some(stats.to_owned());
+//        print(&mut *state);
+//        true
+//    });
     cb.credentials(|_, _, _| {
         let creds = Cred::ssh_key(
             "git",
@@ -93,13 +95,13 @@ fn clone(url : &String, path : &String,config : Config) -> Result<(), git2::Erro
         Ok(creds)
     });
     let mut co = CheckoutBuilder::new();
-    co.progress(|path, cur, total| {
-        let mut state = state.borrow_mut();
-        state.path = path.map(|p| p.to_path_buf());
-        state.current = cur;
-        state.total = total;
-        print(&mut *state);
-    });
+//    co.progress(|path, cur, total| {
+//        let mut state = state.borrow_mut();
+//        state.path = path.map(|p| p.to_path_buf());
+//        state.current = cur;
+//        state.total = total;
+//        print(&mut *state);
+//    });
     let mut fo = FetchOptions::new();
     fo.remote_callbacks(cb);
     RepoBuilder::new()
@@ -120,19 +122,15 @@ fn display_commit(commit: &Commit) { /*proof of work :) */
              commit.author(),
              commit.message().unwrap_or("no commit message"));
 }
-fn add_and_commit(repo: &Repository, message: &str,config : Config) -> Result<Oid,git2::Error> {
-//    println!("path {}" , path.display());
+fn add_and_commit(repo: &Repository, message: &str) -> Result<Oid,git2::Error> {
+    let mut config = config_maker();
     let parent_commit = find_last_commit(&repo)?;
     let mut index  = repo.index().expect("index error");
-//    println!("{}",repo.path().display());
     index.add_all(vec!["."].iter(),git2::IndexAddOption::DEFAULT, None)?;
-//    println!("{}",index.has_conflicts().to_string());
     index.write()?;
     let oid = index.write_tree().expect("write tree");
     let signature = Signature::now(&config.signature_name, &config.signature_mail).expect("sign");
-//    display_commit(&parent_commit);
     let tree = repo.find_tree(oid).expect("find tree");
-//    println!("{}", tree.is_empty());
     repo.commit(Some("HEAD"), //  point HEAD to our new commit
                 &signature, // author
                 &signature, // committer
@@ -181,7 +179,6 @@ fn fetch(path: &Path, config: Config)  -> Result<(), git2::Error>  {
             None
         ).expect("Could not create credentials object.");
         Ok(creds)
-
     });
     let mut fo = FetchOptions::new();
     fo.remote_callbacks(cb);
@@ -212,16 +209,12 @@ fn fetch(path: &Path, config: Config)  -> Result<(), git2::Error>  {
 fn merge(path: &Path,config :Config) -> Result<(), git2::Error> {
     let repo = Repository::open(path)?;
     if repo.index().unwrap().has_conflicts() == true {
-        add_and_commit(&repo,"merging origin/master to master",config)?;
+        add_and_commit(&repo,"merging origin/master to master")?;
     }
-
     if repo.index().unwrap().has_conflicts() == true {
         println!("{} index has conflicts. Resolve them first. Merge failed...",repo.path().display());
         return Ok(())
     }
-
-
-
     let reference = repo.find_reference("FETCH_HEAD")?;
     let fetch = repo.reference_to_annotated_commit(&reference)?;
     let oid = repo.refname_to_id("refs/remotes/origin/master")?;
@@ -229,7 +222,6 @@ fn merge(path: &Path,config :Config) -> Result<(), git2::Error> {
     let mo = &mut MergeOptions::new();
     repo.merge(&[&fetch] ,Some(mo),Some(&mut co))?;
     repo.cleanup_state()?;
-
     let object = repo.find_object(oid, None).unwrap();
     repo.reset(&object, git2::ResetType::Hard, None)?; /*resets repo to origin/master ??? */
     Ok(())
@@ -240,6 +232,18 @@ fn pull (path :& Path){
     merge(path, cfg1);
     fetch(path, cfg2);
 }
+
+fn  multi_pull(dirs : & Vec<String>){
+    for dir in dirs {
+        let mut path = Path::new(&dir);
+        println!( "Repository path : {} ..." , path.display());
+        pull(path);
+    }
+    println!();
+    wait(4);
+}
+
+
 fn push (path: &Path, config : Config ) -> Result<(), git2::Error>  {
     let repo = Repository::open(path).expect("push op. open repository error");
     let mut remote = repo.find_remote("origin").expect("push op. find remote origin");
@@ -262,6 +266,15 @@ fn push (path: &Path, config : Config ) -> Result<(), git2::Error>  {
     if haconflicts return err
     */
     remote.push(&["refs/heads/master:refs/heads/master"], Some(& mut po))
+}
+fn  multi_push(dirs : & Vec<String>){
+    for dir in dirs {
+        let mut path = Path::new(&dir);
+        println!( "Repository path : {} ..." , path.display());
+        push(path,config_maker());
+    }
+    println!();
+    wait(4);
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
@@ -464,6 +477,20 @@ fn status(path : &Path){
     print_long(statuses.borrow());
 }
 
+fn multi_commit(dirs : & Vec<String>){
+    println!("Please enter global commit message..");
+    let mut com_msg = String::new();
+    std::io::stdin().read_line(&mut com_msg);
+    com_msg=com_msg.trim().to_string();
+
+    for dir in dirs {
+        let mut path = Path::new(&dir);
+        println!( "Repository path : {} ..." , path.display());
+        let mut repo = Repository::open(path)?;
+        add_and_commit(&repo,&com_msg);
+    }
+}
+
 fn  multi_status(dirs : & Vec<String>){
     println!("Statuses of repositories are...\n");
     for dir in dirs {
@@ -478,41 +505,30 @@ fn  multi_status(dirs : & Vec<String>){
     wait(4);
 }
 
-
-
 fn  multi_merge(dirs : & Vec<String>,cof: Config){
     for dir in dirs {
         let mut path = Path::new(&dir);
         println!( "Repository path : {} ..." , path.display());
         merge(path,config_maker());
     }
-
     println!();
     wait(4);
 }
 
 fn  multi_fetch(dirs : & Vec<String>,cof: Config){
-
     for dir in dirs {
         let mut path = Path::new(&dir);
         println!( "Repository path : {} ..." , path.display());
         fetch(path,config_maker());
     }
-
     println!();
     wait(3)
 }
 
-
-
 fn run_command(command_name: &String, commnd : &Vec<String>, path : &String){
-
-
-//    let mut command = Command::new(command_name).args(commnd.into_iter()).current_dir(Path::new(path)).output().expect("command failed to start");
     println!("{}",path.clone());
     let mut command = Command::new(command_name).args(commnd.into_iter()).output().expect("command failed to start");       /*curent directory operation*/
     io::stdout().write_all(&command.stdout).unwrap();
-
 }
 
 fn wait(seconds: u64){
@@ -523,68 +539,38 @@ fn wait(seconds: u64){
 }
 
 fn main() {
-//    clone(&"".to_string(),&"".to_string());
-//    add_commit(Path::new("/home/ogulcan/IdeaProjects/git-rust/he"),"rust-deneme");
-    let path = Path::new("/home/ogulcan/IdeaProjects/git-rust");
-    let repo = Repository::open("/home/ogulcan/Desktop/repos/n3").expect("acamadim");
-//    let msg = "merged".to_string();
     let mut config: Config = config_maker();
-
-
-
-
-    let mut repoDirs: Vec<String> = Vec::new();
+    let mut repo_dirs: Vec<String> = Vec::new();
     for fileList in config.repo_parent.iter() {
         for entry in fs::read_dir(Path::new(fileList)).expect("Unable to list") {
             let entry = entry.expect("unable to get entry");
-            let subDir = match Repository::open(entry.path()){
-                Ok(Repository) =>  repoDirs.push(entry.path().to_str().unwrap().to_string()),
+            let sub_dir = match Repository::open(entry.path()){
+                Ok(Repository) =>  repo_dirs.push(entry.path().to_str().unwrap().to_string()),
                 Err(e ) => (),
             };
         }
     }
-
-
-
-//    println!("{:#?}",repoDirs);
     println!("Your current configuration: \n\nRepo_parent(s): {:#?}",config.repo_parent);
     println!("Your SSH key pairs\n\tPrivate: {}\n\tPublic: {}\nSignature name and email: {} - {}",config.ssh_priv,config.ssh_pub,config.signature_name,config.signature_mail);
     print!("If there is a problem with your configuration please try to edit rustit.yaml file in default format...\n");
     println!("\n");
-
-    println!("You currently have {} repositories.", repoDirs.len());
+    println!("You currently have {} repositories.", repo_dirs.len());
     let mut tmp = String::new();
     print!("Do you want to see their names ? [y/n] :");
     println!();
-
     std::io::stdin().read_line(&mut tmp);
     if tmp =="y\n" {
-        for i in &repoDirs {
-
+        for i in &repo_dirs {
             println!("{}", i);
-
         }
     }
-
-
-
     println!();
-
-
-
     let credentials = Cred::ssh_key(
         "git",
         Some(Path::new(&config.ssh_pub)),
         Path::new(&config.ssh_priv),
         None
     ).expect("Could not create credentials object.");
-//    add_and_commit(&repo,path,&msg);
-//    push(path,&credentials);
-//    fetch(path,&credentials);
-//    merge(path);
-
-//    status(path);
-
     loop {
         let mut temp = String::new();
         println!("Please select the operation you want to do.\n1.Status\n2.Fetch\n3.Merge\n4.Pull\n5.Push\n6.Clone\n7.Commit\n8.Custom command");
@@ -595,102 +581,101 @@ fn main() {
         };
         if &temp == "1\n" {
             /*status  */
-            multi_status(&repoDirs);
+            multi_status(&repo_dirs);
         };
         if &temp == "2\n" {
             /*fetch*/
-
-            multi_fetch(&repoDirs,config_maker());
-
+            multi_fetch(&repo_dirs,config_maker());
         };
         if &temp == "3\n" {
             /*Merge*/
-
             println!("This operation works as \"git merge origin/master master\" and you are about to do this operation\nfor ALL of your repositories. Are you sure ???  [y/n]");
             wait(2);
             let mut tr = String::new();
             std::io::stdin().read_line(&mut tr);
             if tr =="y\n" {
-                multi_merge(&repoDirs, config_maker());
+                multi_merge(&repo_dirs, config_maker());
             }
-
-
-
-
         };
         if &temp == "4\n" {
             /*pull*/
-            println!("This operation will fetch and merge your repositories..");
-
-
-
-
+            println!("This operation will fetch and merge your repositories..Are you sure [y/n]");
+            wait(2);
+            let mut tr = String::new();
+            std::io::stdin().read_line(&mut tr);
+            if tr =="y\n" {
+                multi_pull(&repo_dirs);
+            }
         };
         if &temp == "5\n" {
             /*push*/
-            println!("Before pushing, please remember any uncommitted additions/deletions and modifications will not considered on github repository")
-
-
-
-            break;
+            println!("Before pushing, please remember any uncommitted additions/deletions and modifications will not considered on github repository");
+            println!("This operation will push your repositories..Are you sure [y/n]");
+            wait(2);
+            let mut tr = String::new();
+            std::io::stdin().read_line(&mut tr);
+            if tr =="y\n" {
+                multi_push(&repo_dirs);
+            }
         };
         if &temp == "6\n" {
-            /*clone*/
-            break;
-        };
+            println!("Before cloning a repository be sure that destination path is empty..");
+            println!("Please enter the repository url you want to clone");   /*clone dir is under repos directory*/
+            let mut url = String::new();
+            std::io::stdin().read_line(&mut url);
+            url = url.trim().to_string();
+            println!("Please enter the file path...");
+            let mut path = String::new();
+            std::io::stdin().read_line(&mut path);
+            path=path.trim().to_string();
+
+            clone(&url.to_string(), &path.to_string(),&config_maker());
+        }
         if &temp == "7\n" {
             /*commit*/
-            break;
-
-
+            println!("Do you want to commit for all files ?  [y/n] ");
+            let mut all_files = String::new();
+            std::io::stdin().read_line(&mut all_files);
+            if tr =="y\n" {
+                multi_commit(&repo_dirs);
+            }
+            if tr =="n\n" {
+                println!("Please enter the absolute path of the repo...");
+                let mut commit_file = String::new();
+                std::io::stdin().read_line(&mut commit_file);
+                commit_file = commit_file.trim().to_string();
+                println!("Please enter the message to add to the repo...");
+                let mut commit_msg = String::new();
+                std::io::stdin().read_line(&mut commit_msg);
+                commit_msg = commit_msg.trim().to_string();
+                let mut commit_repo = Repository::open(Path::new(commit_file))?;
+                add_and_commit(&commit_repo,&commit_msg,);
+            }
         };
         if &temp == "8\n" {
             /*custom command*/
-
-
-
             println!("Do not forget that your command executions are happening on this programs working directory.\n\
             In order to make a command execution on a specified drectory please state the preferred directory ");
             wait(2);
-
             println!("Please enter command...");
             let mut comd = String::new();
             std::io::stdin().read_line(&mut comd).unwrap();
             comd = comd.trim().to_string();
             let mut split = comd.split_whitespace();
             let mut com_vec : Vec<String> = Vec::new();
-
             for i in split{
                 com_vec.push(i.to_string());
             }
-
-
-//            println!("Please enter the path you want to execute your command");
             let mut pth= String::new();
-//            std::io::stdin().read_line(&mut pth).unwrap();
             let mut cmd_nm = &(com_vec.clone()[0]);
             com_vec.remove(0);
-//            println!("{} \n\n {:#?}\n\n{}",cmd_nm,&com_vec,&pth);
             run_command(cmd_nm,&com_vec,&pth);
             wait(2);
-
-
-
-
-
         }
-
-
     }
 
 
-
-
-
-
-
-
-
+    /*goodbye message*/
 
 
 }
