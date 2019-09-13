@@ -22,9 +22,9 @@ struct State {
     path: Option<PathBuf>,
     newline: bool,
 }
-fn str_concat( x: &String ,  y:  &String) -> String {
-    return &y.clone() + &x.clone();
-}
+//fn str_concat( x: &String ,  y:  &String) -> String {
+//    return &y.clone().c &x.clone();
+//}
 fn print(state: &mut State) {
     let stats = state.progress.as_ref().unwrap();
     let network_pct = (100 * stats.received_objects()) / stats.total_objects();
@@ -286,10 +286,14 @@ struct Config {
 }
 fn config_maker() -> Config {
     if !Path::new("rustit.yaml").exists() {
+        println!("\
+                # Since you do not have a rustit configuration file,\
+                    we are assuming you are using this for the first time."
+        );
         println!("Couldn't fnd rustit.yaml file. Creating one...");
         let mut repo_par : Vec<String> = Vec::new();
-        let mut ssh_pub = String::new();
-        let mut ssh_priv = String::new();
+        let mut ssh_public = String::new();
+        let mut ssh_private = String::new();
         let mut sign_name = String::new();
         let mut sign_mail = String::new();
         println!("Please enter user name for commit Signatures:  ");
@@ -297,14 +301,13 @@ fn config_maker() -> Config {
         println!("Please enter user mail for commit Signatures:  ");
         std::io::stdin().read_line(& mut sign_mail).unwrap();
         println!("Please enter private ssh key path in absolute path format. \nEq. /home/user/.ssh/id_rsa :  ");
-        std::io::stdin().read_line(& mut ssh_priv).unwrap();
+        std::io::stdin().read_line(& mut ssh_private).unwrap();
         println!("Please enter public ssh key path in absolute path format. \nEq. /home/user/.ssh/id_rsa.pub :  ");
-        std::io::stdin().read_line(& mut ssh_pub).unwrap();
+        std::io::stdin().read_line(& mut ssh_public).unwrap();
         println!("Please be careful at this state. You will enter your \"Parent\" repo directories. \nIf your repos' path is /home/user/Desktop/repos/repo1, please enter /home/user/Desktop/repos.");
         loop {
             let mut temp = String::new();
             println!("Please enter q to end this step or enter your repos' parent paths...");
-            println!(": ");
             std::io::stdin().read_line(&mut temp).unwrap();
             if &temp == "q\n" {
                 break;
@@ -313,9 +316,9 @@ fn config_maker() -> Config {
         }
         sign_name = sign_name.trim().to_string();
         sign_mail = sign_mail.trim().to_string();
-        ssh_priv = ssh_priv.trim().to_string();
-        ssh_pub = ssh_pub.trim().to_string();
-        let mut cfg  = Config { repo_parent: repo_par, ssh_pub: ssh_pub, ssh_priv: ssh_priv, signature_name: sign_name, signature_mail: sign_mail };
+        ssh_private = ssh_private.trim().to_string();
+        ssh_public = ssh_public.trim().to_string();
+        let mut cfg  = Config { repo_parent: repo_par, ssh_pub: ssh_public, ssh_priv: ssh_private, signature_name: sign_name, signature_mail: sign_mail };
         println!("{:?}",cfg);
         let file = File::create("rustit.yaml").expect("rustit.yaml (conf file) creation failed...");
         let s = serde_yaml::to_string(&cfg).expect("to str failed");
@@ -486,7 +489,7 @@ fn multi_commit(dirs : & Vec<String>){
     for dir in dirs {
         let mut path = Path::new(&dir);
         println!( "Repository path : {} ..." , path.display());
-        let mut repo = Repository::open(path)?;
+        let mut repo = Repository::open(path).expect("hede");
         add_and_commit(&repo,&com_msg);
     }
 }
@@ -499,7 +502,7 @@ fn  multi_status(dirs : & Vec<String>){
         status(path);
     }
     println!();
-    println!("If there is no explaining for repositories. It is probably clean and up-to-date...");
+    println!("If there is no explaining for repositories. It is probably clean and up-to-date...");  /*adam akıllı kouş lan*/
     println!("You may check. Just to be sure...");
     println!();
     wait(4);
@@ -550,6 +553,7 @@ fn main() {
             };
         }
     }
+
     println!("Your current configuration: \n\nRepo_parent(s): {:#?}",config.repo_parent);
     println!("Your SSH key pairs\n\tPrivate: {}\n\tPublic: {}\nSignature name and email: {} - {}",config.ssh_priv,config.ssh_pub,config.signature_name,config.signature_mail);
     print!("If there is a problem with your configuration please try to edit rustit.yaml file in default format...\n");
@@ -636,10 +640,10 @@ fn main() {
             println!("Do you want to commit for all files ?  [y/n] ");
             let mut all_files = String::new();
             std::io::stdin().read_line(&mut all_files);
-            if tr =="y\n" {
+            if all_files =="y\n" {
                 multi_commit(&repo_dirs);
             }
-            if tr =="n\n" {
+            if all_files =="n\n" {
                 println!("Please enter the absolute path of the repo...");
                 let mut commit_file = String::new();
                 std::io::stdin().read_line(&mut commit_file);
@@ -648,7 +652,7 @@ fn main() {
                 let mut commit_msg = String::new();
                 std::io::stdin().read_line(&mut commit_msg);
                 commit_msg = commit_msg.trim().to_string();
-                let mut commit_repo = Repository::open(Path::new(commit_file))?;
+                let mut commit_repo = Repository::open(Path::new(&commit_file)).expect("repo opening");
                 add_and_commit(&commit_repo,&commit_msg,);
             }
         };
