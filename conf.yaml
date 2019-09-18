@@ -1,0 +1,20 @@
+---
+repos:
+   go-git: /home/ogulcan/Desktop/repos/git2go
+   n1: /home/ogulcan/Desktop/repos/nn
+   n2: /home/ogulcan/Desktop/repos/n3
+   n3: /home/ogulcan/Desktop/repos/yeter
+   n4: /home/ogulcan/Desktop/repos/he
+lists:
+  nlist:
+    - n1
+    - n2
+    - n3
+    - n4
+  ml2:
+    -  go-git
+    -  n1
+ssh_pub: home/ogulcan/.ssh/git.pub
+ssh_priv: home/ogulcan/.ssh/git
+signature_name: Ogulcan Çankaya
+signature_mail: ogulcan985@outlook.com

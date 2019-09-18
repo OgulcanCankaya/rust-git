@@ -12,3 +12,6 @@ docopt = "1"
 serde = {version = "1" , features = ["derive"]}
 openssl = {version = "0.10" , features = ["vendored"] }
 serde_yaml = "0.8"
+yaml-rust = "0.4"
+clap = "2"
+itertools = "0.8.0"
