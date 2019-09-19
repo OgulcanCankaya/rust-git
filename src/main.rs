@@ -16,6 +16,12 @@ use std::collections::HashMap;
 use clap::{Arg, App, SubCommand};
 use clap::AppSettings;
 use itertools::Itertools;
+use std::fs;
+use std::process;
+use std::process::Output;
+use std::str;
+
+
 extern crate yaml_rust;
 
 //#[derive(Deserialize)]
@@ -72,7 +78,9 @@ fn print(state: &mut State) {
 }
 fn clone(url : &String, path : &String,ssh_priv : &String, ssh_public : &String) -> Result<(), git2::Error> {
     println!("url  {}\npath  {}",url.clone(),Path::new(path).display());
-
+    if Path::new(path).exists()==false{
+        fs::create_dir(path.clone()).expect("dir creation failed");
+    }
 //    let state = RefCell::new(State {
 //        progress: None,
 //        total: 0,
@@ -273,6 +281,7 @@ fn  multi_push(dirs : & Vec<String>,ssh_priv : &String , ssh_pub : &String){
     wait(4);
 }
 fn print_long(statuses: &git2::Statuses) {
+
     let mut header = false;
     let mut rm_in_workdir = false;
     let mut changes_in_index = false;
@@ -417,6 +426,7 @@ fn print_long(statuses: &git2::Statuses) {
 fn status(path : &Path){
     let repo = Repository::open(path).expect("repo opening error");
     let mut so = git2::StatusOptions::new();
+    so.include_untracked(true);
     let statuses = repo.statuses(Some(&mut so)).expect("stat take error");
     print_long(statuses.borrow());
 }
@@ -464,10 +474,10 @@ fn  multi_fetch(dirs : & Vec<String>, ssh_priv : &String, ssh_public : &String){
     println!();
     wait(3)
 }
-fn run_command(command_name: &String, commnd : &Vec<String>, path : &String){
-//    println!("{}",path.clone());
+fn run_command(command_name: &String, commnd : &Vec<String>, path : &String) -> Output {
     let mut command = Command::new(command_name).current_dir(path.clone().to_string()).args(commnd.into_iter()).output().expect("command failed to start");       /*curent directory operation*/
-    io::stdout().write_all(&command.stdout).unwrap();
+    return command.clone()
+//io::stdout().write_all(&command.stdout).unwrap();
 }
 fn wait(seconds: u64){
     let ten_millis = time::Duration::from_secs(seconds);
@@ -497,17 +507,6 @@ fn main() {
         repo_list.insert(i.as_str().expect("sdfsf").to_string(),temp_repo_conta.clone());
     }
 
-
-//    for i in repo_list.get("nlist").unwrap() {
-//        println!("{:?}",i);
-//    }
-//    println!("{:?}",repo_list);
-
-
-
-
-
-    println!("{:#?}", repo_dirs);
     let mut glob_ssh_priv = String::new();
     let mut glob_ssh_pub = String::new();
     let mut glob_sign_mail = String::new();
@@ -529,12 +528,18 @@ fn main() {
 
     let matches = App::new("rustit")
         .version("0.1")
-        .author("catastrophe <hede-hodo@wtf.com>")
-        .about("alayına isyan")
+        .author("catastrophe <ocankaya@protonmail.com>")
+        .about("handling git (github) stuff")
+        .arg(Arg::with_name("format")
+            .short("f")
+            .long("format")
+            .value_name("type")
+            .help("Sets a custom output type")
+            .takes_value(true))
         .subcommand(SubCommand::with_name("list")
-            .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .about("listing repositories ")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
                 .default_value("all")
                 .help("enter repos").multiple(true)
@@ -542,56 +547,59 @@ fn main() {
 
         .subcommand(SubCommand::with_name("status")
             .about("controls status features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
-                .help("enter repos").multiple(true)
+                .help("enter repos").multiple(true).default_value("all")
                 .takes_value(true).required(true).min_values(1)))
 
         .subcommand(SubCommand::with_name("merge")
             .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
                 .help("enter repos").multiple(true)
                 .takes_value(true).required(true).min_values(1)))
 
         .subcommand(SubCommand::with_name("pull")
             .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
                 .help("enter repos").multiple(true)
                 .takes_value(true).required(true).min_values(1)))
 
         .subcommand(SubCommand::with_name("clone")
             .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
-            .arg(Arg::with_name("repos")
-                .help("enter repos").multiple(true)
-                .takes_value(true).required(true).min_values(1)))
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
+            .arg(Arg::with_name("url")
+                .help("enter repos").multiple(false)
+                .takes_value(true).required(true))
+            .arg(Arg::with_name("path")
+                .help("enter repos").multiple(false)
+                .takes_value(true).required(true)))
 
         .subcommand(SubCommand::with_name("push")
-            .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .about("controls pushing features")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
                 .help("enter repos").multiple(true)
                 .takes_value(true).required(true).min_values(1)))
 
         .subcommand(SubCommand::with_name("fetch")
             .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .arg(Arg::with_name("repos")
                 .help("enter repos").multiple(true).default_value("all")
                 .takes_value(true).min_values(1)))
 
         .subcommand(SubCommand::with_name("exec")
             .about("controls testing features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
+            .version("0.1")
+            .author("OgulcanCankaya. <ocankaya@protonmail.com>")
             .setting(AppSettings::TrailingVarArg)
             .arg(Arg::with_name("repos")
                 .help("enter repos").multiple(true)
@@ -599,29 +607,64 @@ fn main() {
             .arg(Arg::with_name("command")
                 .help("print debug information verbosely").last(true)
                 .takes_value(true).required(true).min_values(1)))
-        
-        .subcommand(SubCommand::with_name("clone")
-            .about("controls cloning features")
-            .version("1.3")
-            .author("Someone E. <someone_else@other.com>")
-            .arg(Arg::with_name("url_path")
-                .help("enter repos").multiple(true).default_value("all")
-                .takes_value(true).min_values(1)))
+
         .get_matches();
 
-
+    if matches.is_present("format") {
+        println!("{:#?}",matches.values_of("format"));
+    }
         /*checking what are you doing*/
     if matches.is_present("fetch") {
-        println!("wanted to fetch");
-        let mut aa =matches.subcommand_matches("fetch").expect("hede")
+//        println!("wanted to fetch");
+        let mut repos =matches.subcommand_matches("fetch").expect("hede")
             .values_of("repos").expect("hodo");
-        println!("{:?}",aa);
-        for i in aa {
-            println!("{}",i)
+        let mut repo_vec:Vec<String> =Vec::new();
+
+        for i in repos.clone() {
+            repo_vec.push(i.to_string());
         }
+
+        /*Deleting repo-list names from repo names so there would be no None type value*/
+        for i in repo_vec.clone() {
+
+            if repo_list.contains_key(&i) {
+                let mut ind : usize = 0;
+                for k in repo_vec.clone() {
+                    if k == i { break;}
+                    ind = ind + 1;
+                }
+                repo_vec.remove(ind);
+                for j in repo_list.get(&i.to_string()).unwrap() {
+                    repo_vec.push(j.to_string());
+                }
+            }
+        }
+
+        let mut repo_vec_unique :Vec<String> = Vec::new();
+        if repo_vec.contains(&"all".to_string()) {
+            for i in repo_dirs.clone().keys() {
+                repo_vec_unique.push(i.to_string());
+            }
+        }else {
+            repo_vec_unique =  repo_vec.clone().into_iter().unique().collect();
+        }
+        for i in repo_vec_unique.clone() {
+            if !repo_dirs.contains_key(&i) {
+                println!("No repository found with name {}" , &i);
+                process::exit(212);
+            }
+            let mut path = &repo_dirs.get(&i).clone().unwrap().to_string();
+            let mut re_path = Path::new(path);
+            println!("----------------------------------------\n{}",path);
+            fetch(&re_path,&glob_ssh_priv.clone(),&glob_ssh_pub.clone());
+        }
+
+
+
+
     }
     if matches.is_present("list") {
-        println!("wanted to list");
+        let mut output : HashMap<String,String> = HashMap::new();
         let mut repos =matches.subcommand_matches("list").expect("hede")
                 .values_of("repos").expect("hodo");
         let mut repo_vec:Vec<String> =Vec::new();
@@ -635,39 +678,32 @@ fn main() {
                     if k == i { break;}
                     ind = ind + 1;
                 }
-                println!("deleting {}",repo_vec.get(ind).unwrap().to_string());
                 repo_vec.remove(ind);
-                println!("found a list : {}", i.to_string());
                 for j in repo_list.get(&i.to_string()).unwrap() {
                     repo_vec.push(j.to_string());
                 }
             }
         }
-        let mut repo_vec_unique :Vec<_> = repo_vec.clone().into_iter().unique().collect();
-
+        let mut repo_vec_unique :Vec<String> = Vec::new();
         if repo_vec.contains(&"all".to_string()) {
             for i in repo_dirs.clone().keys() {
                 repo_vec_unique.push(i.to_string());
             }
+        }else {
+            repo_vec_unique =  repo_vec.clone().into_iter().unique().collect();
         }
-
-
-
-
         for i in repo_vec_unique.clone() {
             if !repo_dirs.contains_key(&i) {
-                println!("\nNo repository found with name {}\n-----------------------------------",i);
-                continue;
+                println!("No repository found with name {}" , &i);
+                process::exit(211);
             }
-            println!("Path for {} is :  \n{}\n-----------------------------------",i,repo_dirs.get(&i).unwrap().to_string());
+            output.insert(i.clone(),repo_dirs.get(&i).unwrap().to_string());
+
         }
+
+        println!("{:#?}",output);
     }
-
-
-
-
     if matches.is_present("exec") {
-        println!("wanted to exec");
         let mut aa = matches.subcommand_matches("exec").expect("hede");
         let mut cmm = aa.values_of("command").expect("hodo");
         let mut repos = aa.values_of("repos").expect("lalalolo");
@@ -687,48 +723,152 @@ fn main() {
                     if k == i { break;}
                     ind = ind + 1;
                 }
-                println!("deleting {}",repo_vec.get(ind).unwrap().to_string());
                 repo_vec.remove(ind);
-                println!("found a list : {}", i.to_string());
+//                println!("found a list : {}", i.to_string());
                 for j in repo_list.get(&i.to_string()).unwrap() {
-                    println!("these are the contents{:?}",i);
                     repo_vec.push(j.to_string());
                 }
             }
         }
         /*deleting unique values*/
-        let mut repo_vec_unique :Vec<_> = repo_vec.clone().into_iter().unique().collect();
+        let mut repo_vec_unique :Vec<String> = Vec::new();
+        if repo_vec.contains(&"all".to_string()) {
+            for i in repo_dirs.clone().keys() {
+                repo_vec_unique.push(i.to_string());
+            }
+        }else {
+            repo_vec_unique =  repo_vec.clone().into_iter().unique().collect();
+        }
         let mut cmd_name = String::new();
         cmd_name=cmnd_vec[0].clone().to_string();
-        println!("{}",cmd_name);
+//        println!("{}",cmd_name);
         cmnd_vec.remove(0);
-        println!("{:#?}",repo_dirs);
-        println!("{:#?}",repo_vec_unique);
+//        println!("{:#?}",repo_dirs);
+//        println!("{:#?}",repo_vec_unique);
+        let mut output : HashMap<String,String> = HashMap::new();
+
         for i in repo_vec_unique {
-            println!("{:?}",&repo_dirs.clone().get(i.as_str()));
-            run_command(&cmd_name,&cmnd_vec,&repo_dirs.clone().get(&i).unwrap().to_string());
+            if !repo_dirs.contains_key(&i) {
+                println!("No repository found with name {}" , &i);
+                process::exit(213);
+            }
+//            println!("{}",&repo_dirs.clone().get(i.as_str()).unwrap().to_string());
+            let mut outputstr = run_command(&cmd_name,&cmnd_vec,&repo_dirs.clone().get(&i).unwrap().to_string());
+            let str_ver = str::from_utf8(&outputstr.clone().stdout).unwrap().to_string();
+            output.insert(i.clone(),str_ver);
         }
+        println!("{:#?}",output);
     }
     if matches.is_present("merge") {
         println!("wanted to merge");
-        let mut aa =matches.subcommand_matches("merge").expect("hede")
-            .values_of("command").expect("hodo");
-        println!("{:?}",aa);
-        println!("{:?}",matches.subcommand_matches("merge").expect("lolo").values_of("repos").expect("lala"));
+        let mut repos =matches.subcommand_matches("merge").expect("hede")
+            .values_of("repos").expect("hodo");
+        let mut repo_vec:Vec<String> =Vec::new();
+        for i in repos.clone() {
+            repo_vec.push(i.to_string());
+        }
+
+        /*Deleting repo-list names from repo names so there would be no None type value*/
+        for i in repo_vec.clone() {
+
+            if repo_list.contains_key(&i) {
+                let mut ind : usize = 0;
+                for k in repo_vec.clone() {
+                    if k == i { break;}
+                    ind = ind + 1;
+                }
+                repo_vec.remove(ind);
+                for j in repo_list.get(&i.to_string()).unwrap() {
+                    repo_vec.push(j.to_string());
+                }
+            }
+        }
+
+        let mut repo_vec_unique :Vec<String> = Vec::new();
+        if repo_vec.contains(&"all".to_string()) {
+            for i in repo_dirs.clone().keys() {
+                repo_vec_unique.push(i.to_string());
+            }
+        }else {
+            repo_vec_unique =  repo_vec.clone().into_iter().unique().collect();
+        }
+        for i in repo_vec_unique.clone() {
+            if !repo_dirs.contains_key(&i) {
+                println!("No repository found with name {}" , &i);
+                process::exit(211);
+            }
+            let mut path = &repo_dirs.get(&i).clone().unwrap().to_string();
+            let mut re_path = Path::new(path);
+            println!("----------------------------------------\n{}",path);
+            merge(&re_path,&glob_ssh_priv.clone(),&glob_ssh_pub.clone());
+        }
+
+
+
     }
     if matches.is_present("status") {
-        println!("wanted to status");
-        let mut aa =matches.subcommand_matches("status").expect("hede")
-            .values_of("command").expect("hodo");
-        println!("{:?}",aa);
-        println!("{:?}",matches.subcommand_matches("status").expect("lolo").values_of("repos").expect("lala"));
+//        println!("wanted to status");
+        let mut repos =matches.subcommand_matches("status").expect("hede")
+            .values_of("repos").expect("hodo-status");
+
+        let mut repo_vec:Vec<String> =Vec::new();
+        for i in repos.clone() {
+            repo_vec.push(i.to_string());
+        }
+        for i in repo_vec.clone() {
+            if repo_list.contains_key(&i) {
+                let mut ind : usize = 0;
+                for k in repo_vec.clone() {
+                    if k == i { break;}
+                    ind = ind + 1;
+                }
+//                println!("deleting {}",repo_vec.get(ind).unwrap().to_string());
+                repo_vec.remove(ind);
+//                println!("found a list : {}", i.to_string());
+                for j in repo_list.get(&i.to_string()).unwrap() {
+                    repo_vec.push(j.to_string());
+                }
+            }
+        }
+        let mut repo_vec_unique :Vec<String> = Vec::new();
+        if repo_vec.contains(&"all".to_string()) {
+            for i in repo_dirs.clone().keys() {
+                repo_vec_unique.push(i.to_string());
+            }
+        }else {
+            repo_vec_unique =  repo_vec.clone().into_iter().unique().collect();
+        }
+        println!("{:#?}",repo_vec_unique);
+        for i in repo_vec_unique.clone() {
+            if !repo_dirs.contains_key(&i) {
+                println!("No repository found with name {}" , &i);
+                process::exit(211);
+            }
+            let mut path = &repo_dirs.get(&i).clone().unwrap().to_string();
+            let mut re_path = Path::new(path);
+            println!("----------------------------------------\n{}",path);
+            status(&re_path);
+
+
+        }
+
+
+        println!("-----------------------------------\nIf message line is empty either you have a clean repo or something is really wrong...\n-----------------------------------")
+
+
+
     }
     if matches.is_present("clone") {
-        println!("wanted to merge");
-        let mut aa =matches.subcommand_matches("clone").expect("hede")
-            .values_of("url_path").expect("hodo");
-        println!("{:?}",aa);
-        println!("{:?}",matches.subcommand_matches("clone").expect("lolo").values_of("url_path").expect("lala"));
+        println!("wanted to clone");
+        let mut url =matches.subcommand_matches("clone").expect("hede")
+            .values_of("url").expect("hodo-status");
+        let mut path =matches.subcommand_matches("clone").expect("hede")
+            .values_of("path").expect("hodo-status");
+
+        println!("Cloning starts");
+        clone(&url.clone().nth(0).unwrap().to_string(),&path.clone().nth(0).unwrap().to_string(),&glob_ssh_priv.clone(),&glob_ssh_pub.clone());
+//        run_command(&"ls".to_string(),&vec!["-alh".to_string()],&path.clone().nth(0).unwrap().to_string())
+
     }
     /*goodbye message*/
 
